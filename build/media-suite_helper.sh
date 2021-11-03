@@ -228,13 +228,17 @@ do_mabs_clone() {
 #   do_vcs "url#branch|revision|tag|commit=NAME" "folder"
 do_vcs() {
     local vcsURL=${1#*::} vcsFolder=$2 vcsCheck=("${_check[@]}")
+    # Remove text in vcsURL up to first '#'
     local vcsBranch=${vcsURL#*#} ref=origin/HEAD
     local deps=("${_deps[@]}") && unset _deps
+    # If vcsURL contained no '#', unset vcsBranch
     [[ $vcsBranch == "$vcsURL" ]] && unset vcsBranch
     vcsURL=${vcsURL%#*}
     : "${vcsFolder:=$(basename "$vcsURL" .git)}"
 
+    # If vcsBranch is not empty, then ...
     if [[ -n $vcsBranch ]]; then
+        # ... remove text after last '='
         ref=${vcsBranch##*=}
         [[ ${vcsBranch%%=*}/$ref == branch/${ref%/*} ]] && ref=origin/$ref
     fi
