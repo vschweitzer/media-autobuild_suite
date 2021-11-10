@@ -3,7 +3,11 @@
 shopt -s extglob
 
 ffmpeg_path="https://git.ffmpeg.org/ffmpeg.git"
-ffmpeg_path_suffix=""
+# Change this to change version
+# Beware: changing the version *will* potentially
+# change dependencies or configure options, and may
+# therefore break the compilation
+ffmpeg_path_suffix="#branch=release/4.4"
 
 if [[ -z $LOCALBUILDDIR ]]; then
     printf '%s\n' \
@@ -83,6 +87,7 @@ done
 
 # shellcheck source=media-suite_helper.sh
 source "$LOCALBUILDDIR"/media-suite_helper.sh
+save_version_info # Delete old version file (custom)
 
 do_simple_print -p "${orange}Warning: We will not accept any issues lacking any form of logs or logs.zip!$reset"
 

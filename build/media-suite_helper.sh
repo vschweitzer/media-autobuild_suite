@@ -243,6 +243,9 @@ do_vcs() {
         [[ ${vcsBranch%%=*}/$ref == branch/${ref%/*} ]] && ref=origin/$ref
     fi
 
+    do_print_status "┌ $vcsFolder git" "$orange" "vcsBranch: $vcsBranch"
+    do_print_status "┌ $vcsFolder git" "$orange" "ref: $ref"
+
     cd_safe "$LOCALBUILDDIR"
 
     rm -f "$vcsFolder-git/custom_updated"
@@ -255,9 +258,15 @@ do_vcs() {
     # if so, set ref to the ref on the origin, this might make it harder for people who
     # want use multiple remotes other than origin. Converts ref=develop to ref=origin/develop
     # ignore those that use the special tags/branches
+    # *) Matches any, default option
+
+    # Custom test function; used to save dependency versions by dependency path to easier recreate builds
+    save_version_info "$vcsURL" "$ref"
+
     case $ref in
     LATEST | GREATEST | *\**) ;;
-    *) git ls-remote --exit-code "$vcsURL" "${ref#origin/}" > /dev/null 2>&1 && ref=origin/${ref#origin/} ;;
+    *) git ls-remote --exit-code "$vcsURL" "${ref#origin/}" > /dev/null 2>&1 && ref=origin/${ref#origin/}
+    do_print_progress "ref (${ref}) matched *), executed ls-remote" ;;
     esac
 
     if ! check_valid_vcs "$vcsFolder-git"; then
@@ -283,18 +292,24 @@ do_vcs() {
     fi
 
     vcs_set_url "$vcsURL"
+    do_print_progress "Running vcs_set_url on ${vcsURL}"
     log -q git.fetch vcs_fetch
     oldHead=$(vcs_get_merge_base "$ref")
     newHead="$oldHead"
 
     if ! [[ -f recently_checked && recently_checked -nt "$LOCALBUILDDIR/last_run" ]]; then
         do_print_progress "  Running git update for $vcsFolder"
+        do_print_progress "vcs_reset uses " $(vcs_get_latest_tag $ref) ""
         log -q git.reset vcs_reset "$ref"
+        #echo! ref
         newHead=$(vcs_get_current_head "$PWD")
         touch recently_checked
     fi
 
+
     vcs_clean
+
+    do_print_progress "oldHead ${oldHead} / newHead ${newHead}"
 
     if [[ $oldHead != "$newHead" || -f custom_updated ]]; then
         touch recently_updated
@@ -2554,4 +2569,38 @@ safe_git_clean() {
         -e '/custom_updated' \
         -e '**/ab-suite.*.log' \
         "${@}"
+}
+
+# ----- Custom -----
+
+# TODO: Put this into media-suite_helper to access utility functions
+# TODO: Find latest tag when ref is latest/greatest
+# TODO: Get commit from tag
+
+# Include in other scripts: https://stackoverflow.com/questions/192292/how-best-to-include-other-scripts
+
+save_version_info() {
+    dependency_url=${1}
+    dependency_ref=${2}
+    dependency_commit=""
+
+    if [ -z ${1+x} ]; then
+        rm -f ./dependency_versions.txt
+        return
+    fi
+
+    case $dependency_ref in
+    LATEST | GREATEST | *\**) dependency_commit=$(git ls-remote $dependency_url HEAD)
+    echo "LATEST/GREATEST" ;;
+    origin/*) dependency_commit=$(git ls-remote $dependency_url ${dependency_ref#origin/})
+    echo "origin/*";;
+    *) git ls-remote --exit-code "$dependency_url" "${dependency_ref#origin/}" > /dev/null 2>&1 && dependency_ref=origin/${dependency_ref#origin/}
+    dependency_commit=$(git ls-remote $dependency_url ${dependency_ref#origin/})
+    echo "Default" ;;
+    esac
+
+    dependency_commit=${dependency_commit:0:40}
+
+    echo "${dependency_url};${dependency_ref};${dependency_commit}"
+    echo "${dependency_url};${dependency_ref};${dependency_commit}" >> ./dependency_versions.txt
 }
