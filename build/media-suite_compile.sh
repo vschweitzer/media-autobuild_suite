@@ -80,6 +80,7 @@ done
 
 # shellcheck source=media-suite_helper.sh
 source "$LOCALBUILDDIR"/media-suite_helper.sh
+save_version_info # Delete old version file (custom)
 
 do_simple_print -p "${orange}Warning: We will not accept any issues lacking any form of logs or logs.zip!$reset"
 

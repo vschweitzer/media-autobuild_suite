@@ -251,6 +251,10 @@ do_vcs() {
     # if so, set ref to the ref on the origin, this might make it harder for people who
     # want use multiple remotes other than origin. Converts ref=develop to ref=origin/develop
     # ignore those that use the special tags/branches
+
+    # Custom function; used to save dependency versions by dependency path to easier recreate builds
+    save_version_info "$vcsURL" "$ref"
+
     case $ref in
     LATEST | GREATEST | *\**) ;;
     *) git ls-remote --exit-code "$vcsURL" "${ref#origin/}" > /dev/null 2>&1 && ref=origin/${ref#origin/} ;;
@@ -2550,4 +2554,38 @@ safe_git_clean() {
         -e '/custom_updated' \
         -e '**/ab-suite.*.log' \
         "${@}"
+}
+
+# Custom
+
+save_version_info() {
+    # Save version info in the format for url;ref (usually branch or something like "latest");commit
+    # This info can be used to "freeze" a version, i.e. set all dependencies to
+    # a certain commit.
+    dependency_url=${1}
+    dependency_ref=${2}
+    dependency_commit=""
+
+    if [ -z ${1+x} ]; then
+        rm -f ./dependency_versions.txt
+        return
+    fi
+
+    case $dependency_ref in
+    LATEST | GREATEST | *\**) dependency_commit=$(git ls-remote $dependency_url HEAD)
+    #echo "LATEST/GREATEST"
+    ;;
+    origin/*) dependency_commit=$(git ls-remote $dependency_url ${dependency_ref#origin/})
+    #echo "origin/*"
+    ;;
+    *) git ls-remote --exit-code "$dependency_url" "${dependency_ref#origin/}" > /dev/null 2>&1 && dependency_ref=origin/${dependency_ref#origin/}
+    dependency_commit=$(git ls-remote $dependency_url ${dependency_ref#origin/})
+    #echo "Default"
+    ;;
+    esac
+
+    dependency_commit=${dependency_commit:0:40}
+
+    #echo "${dependency_url};${dependency_ref};${dependency_commit}"
+    echo "${dependency_url};${dependency_ref};${dependency_commit}" >> ./dependency_versions.txt
 }
